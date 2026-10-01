@@ -45,7 +45,8 @@ class Settings(BaseSettings):
     sql_max_rows: int = Field(default=200, alias="SQL_MAX_ROWS")
 
     max_sql_retries: int = Field(default=2, alias="AGENT_MAX_SQL_RETRIES")
-    max_llm_requests: int = Field(default=4, alias="AGENT_MAX_LLM_REQUESTS")
+    max_llm_requests: int = Field(default=6, alias="AGENT_MAX_LLM_REQUESTS")
+    # Ignorado pelo agente (ADR 013). A resposta sai depois que o modelo vê as linhas da ferramenta.
     narrate: bool = Field(default=True, alias="AGENT_NARRATE")
     cache_enabled: bool = Field(default=True, alias="AGENT_CACHE_ENABLED")
     cache_path: str = Field(default=".cache/respostas.json", alias="AGENT_CACHE_PATH")
