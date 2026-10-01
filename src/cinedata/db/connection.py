@@ -96,7 +96,7 @@ class ReadOnlyDatabase:
             )
         self.timeout_seconds = timeout_seconds
         self.max_rows = max_rows
-        self._uri = f"file:{quote(self.path.as_posix(), safe='/')}?mode=ro"
+        self._uri = f"file:{quote(self.path.as_posix(), safe='/')}?mode=ro&immutable=1"
 
     def _connect(self, deadline: float) -> sqlite3.Connection:
         connection = sqlite3.connect(self._uri, uri=True, check_same_thread=False)
