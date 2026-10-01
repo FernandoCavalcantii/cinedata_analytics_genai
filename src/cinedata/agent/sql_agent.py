@@ -53,11 +53,19 @@ class ConsultaExecutada:
 
 
 @dataclass
+class TurnoAnterior:
+    pergunta: str
+    sql: str | None
+    resposta: str
+
+
+@dataclass
 class AgentDeps:
     db: ReadOnlyDatabase
     question: str
     context: RetrievalContext
     hoje: date
+    historico: list[TurnoAnterior] = field(default_factory=list)
     tentativas: int = 0
     consultas: list[ConsultaExecutada] = field(default_factory=list)
 
@@ -71,6 +79,21 @@ class ResultadoAgente:
     sql: str | None
     dados: QueryResult | None
     requisicoes: int
+    modelo: str
+
+
+def _historico_prompt(turnos: list[TurnoAnterior]) -> str:
+    if not turnos:
+        return ""
+    blocos = []
+    for indice, turno in enumerate(turnos, start=1):
+        sql = turno.sql or "(sem SQL)"
+        blocos.append(f"{indice}. Pergunta: {turno.pergunta}\n   SQL: {sql}\n   Resposta: {turno.resposta}")
+    return (
+        "Conversa até aqui. Use isto quando a pergunta for continuação, como 'e o segundo colocado?'.\n"
+        + "\n".join(blocos)
+        + "\n\n"
+    )
 
 
 def render_prompt(deps: AgentDeps) -> str:
@@ -78,6 +101,7 @@ def render_prompt(deps: AgentDeps) -> str:
 Você consulta o catálogo de filmes da CineData Analytics. O banco é SQLite, somente leitura.
 Hoje é {deps.hoje.isoformat()}.
 
+{_historico_prompt(deps.historico)}
 Para qualquer pergunta sobre os filmes, chame a ferramenta executar_consulta_sql.
 Leia as linhas que ela devolver. Se vierem vazias, se as colunas não forem as da pergunta
 ou se os valores parecerem implausíveis, chame a ferramenta de novo com outro SQL.
@@ -167,6 +191,7 @@ async def responder(
     settings: Settings,
     model: Model | None = None,
     hoje: date | None = None,
+    historico: list[TurnoAnterior] | None = None,
 ) -> ResultadoAgente:
     """Roda uma pergunta. Sem modelo explícito, usa o roteador do `.env`."""
 
@@ -176,6 +201,7 @@ async def responder(
         question=question,
         context=InformationRetriever(db).retrieve(question),
         hoje=hoje or date.today(),
+        historico=list(historico or []),
     )
     result = await build_sql_agent(settings).run(
         question,
@@ -184,6 +210,7 @@ async def responder(
         usage_limits=UsageLimits(request_limit=settings.max_llm_requests),
     )
     output = result.output
+    modelo = result.response.model_name or "desconhecido"
     ultima = deps.consultas[-1] if deps.consultas else None
     if ultima is None:
         status: Literal["fora_do_escopo", "erro"] = "erro" if deps.tentativas else "fora_do_escopo"
@@ -195,6 +222,7 @@ async def responder(
             sql=None,
             dados=None,
             requisicoes=result.usage.requests,
+            modelo=modelo,
         )
     return ResultadoAgente(
         status="ok",
@@ -204,4 +232,5 @@ async def responder(
         sql=ultima.sql,
         dados=ultima.result,
         requisicoes=result.usage.requests,
+        modelo=modelo,
     )
