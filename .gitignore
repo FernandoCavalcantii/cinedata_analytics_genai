@@ -1,0 +1,50 @@
+# Ambientes Virtuais
+.venv/
+venv/
+env/
+ENV/
+
+# Python Cache & Compilação
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Variáveis de Ambiente e Chaves de API
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Bancos de Dados SQLite e Dados Volumosos (>100MB)
+*.db
+*.sqlite
+*.sqlite3
+cinerocket-db/
+data/
+*.zip
+*.tar.gz
+
+# Testes e Cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDEs e Editores
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+.DS_Store
+
+# Logs e cache de respostas do agente
+*.log
+logs/
+.cache/
+.logfire/

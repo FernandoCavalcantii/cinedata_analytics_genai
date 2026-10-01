@@ -1,0 +1,44 @@
+[project]
+name = "cinedata-analytics-genai"
+version = "0.1.0"
+description = "Agente Text-to-SQL para o catálogo de filmes CineData Analytics (Rocket Lab 2026.2)"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Fernando Cavalcanti", email = "fernandocavalcanti.dev@gmail.com" }
+]
+dependencies = [
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "pydantic-ai-slim[openai,google,openrouter]>=1.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlglot>=26.0.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+observability = [
+    "logfire>=3.0.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+cinedata = "cinedata.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cinedata"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: chama provedores de LLM reais (consome cota do OpenRouter/Gemini)",
+]
+addopts = "-m 'not live'"
