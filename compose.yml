@@ -1,0 +1,12 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    environment:
+      CINEROCKET_DB_PATH: /app/data/cinerocket.db
+      AGENT_CACHE_PATH: /tmp/respostas.json
+    ports:
+      - "8000:8000"
+    volumes:
+      # O arquivo do host entra só para leitura. A imagem não contém o banco.
+      - "./cinerocket-db/cinerocket (1).db:/app/data/cinerocket.db:ro"
