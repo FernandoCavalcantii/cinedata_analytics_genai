@@ -3,6 +3,7 @@
 import asyncio
 import json
 
+from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
@@ -19,8 +20,6 @@ def _settings(tmp_path) -> Settings:
         openrouter_api_key="",
         openrouter_models=[],
         gemini_api_keys=[],
-        openai_api_keys=[],
-        openai_api_key="",
         max_sql_retries=2,
         max_llm_requests=6,
         cache_enabled=True,
@@ -174,3 +173,38 @@ def test_pergunta_vazia_nao_chama_o_modelo(db: ReadOnlyDatabase, tmp_path) -> No
 
     assert resposta.status == "erro"
     assert chamadas["n"] == 0
+
+
+def test_roteador_e_montado_uma_vez_com_gemini_antes_do_openrouter(db: ReadOnlyDatabase, tmp_path) -> None:
+    settings = _settings(tmp_path).model_copy(
+        update={
+            "gemini_api_keys": ["g"],
+            "gemini_model": "gemini-3.5-flash-lite",
+            "openrouter_api_key": "chave-openrouter",
+            "openrouter_models": ["openrouter/free"],
+        }
+    )
+    servico = ServicoAgente(settings, db)
+
+    roteador = servico.roteador()
+
+    assert roteador.chain == ["google:gemini-3.5-flash-lite#1", "openrouter:openrouter/free"]
+    assert servico.roteador() is roteador
+
+
+def test_teto_de_chamadas_avisa_em_portugues_e_conta_as_requisicoes(db: ReadOnlyDatabase, tmp_path, monkeypatch) -> None:
+    async def estoura(*_args, **_kwargs):
+        raise UsageLimitExceeded("The next request would exceed the request_limit of 6")
+
+    monkeypatch.setattr("cinedata.agent.service.responder", estoura)
+    servico = ServicoAgente(
+        _settings(tmp_path),
+        db,
+        model=FunctionModel(_modelo_receita({"n": 0}, []), model_name="falso"),
+    )
+
+    resposta = asyncio.run(servico.perguntar(PERGUNTA, "c"))
+
+    assert resposta.status == "erro"
+    assert "6 chamadas" in resposta.resposta
+    assert resposta.metadados.requisicoes == 6

@@ -12,10 +12,11 @@ from rich.panel import Panel
 from rich.table import Table
 
 from cinedata.agent.service import RespostaServico, ServicoAgente
-from cinedata.config import get_settings
+from cinedata.config import Settings, get_settings
 from cinedata.db.connection import ReadOnlyDatabase
 
 SAIR = {"sair", "exit", "quit"}
+INSTRUCOES = {"instrucoes", "instruções", "ajuda", "help", "?"}
 
 
 def imprimir_resposta(resposta: RespostaServico, console: Console) -> None:
@@ -46,6 +47,42 @@ def imprimir_resposta(resposta: RespostaServico, console: Console) -> None:
     )
 
 
+def descrever_modelos(settings: Settings) -> str:
+    return f"Gemini ({settings.gemini_model}). Se falhar, OpenRouter."
+
+
+def imprimir_boas_vindas(settings: Settings, console: Console) -> None:
+    console.print("CineData. Pergunte em português sobre o catálogo de filmes.")
+    console.print(f"Modelos: {descrever_modelos(settings)}")
+    console.print("Comandos: [bold]instrucoes[/], [bold]limpar[/], [bold]csv[/], [bold]sair[/].")
+
+
+def imprimir_instrucoes(settings: Settings, console: Console) -> None:
+    console.print(
+        "\n".join(
+            [
+                "Escreva a pergunta e pressione Enter. Exemplo: qual os 3 filmes com maior lucro em dólares?",
+                "",
+                f"A pergunta vai primeiro para o {descrever_modelos(settings)}",
+                "",
+                "Comandos (escreva só o comando e pressione Enter):",
+                "",
+                "  instrucoes",
+                "    Mostra este texto. ajuda, help e ? fazem o mesmo.",
+                "",
+                "  limpar",
+                "    Apaga as respostas guardadas. A mesma pergunta volta a consultar o modelo.",
+                "",
+                "  csv",
+                "    Grava a última tabela em resultado.csv, na pasta de onde você iniciou o comando.",
+                "",
+                "  sair",
+                "    Encerra. As perguntas anteriores desta sessão não ficam guardadas para a próxima.",
+            ]
+        )
+    )
+
+
 def exportar_csv(resposta: RespostaServico, destino: Path) -> Path:
     if resposta.dados is None or not resposta.dados.colunas:
         raise ValueError("Não há tabela para exportar.")
@@ -60,8 +97,23 @@ def exportar_csv(resposta: RespostaServico, destino: Path) -> Path:
 
 
 def loop(servico: ServicoAgente, console: Console, conversa_id: str | None = None) -> None:
-    console.print("CineData. Pergunte sobre o catálogo. Comandos: [bold]sair[/], [bold]limpar[/], [bold]csv[/].")
+    imprimir_boas_vindas(servico.settings, console)
     ultima: RespostaServico | None = None
+    # Um único loop: o cliente HTTP do roteador fica preso nele. asyncio.run() fecharia o loop a cada pergunta.
+    event_loop = asyncio.new_event_loop()
+    try:
+        _loop(servico, console, conversa_id, ultima, event_loop)
+    finally:
+        event_loop.close()
+
+
+def _loop(
+    servico: ServicoAgente,
+    console: Console,
+    conversa_id: str | None,
+    ultima: RespostaServico | None,
+    event_loop: asyncio.AbstractEventLoop,
+) -> None:
     while True:
         linha = console.input("[bold]Pergunta[/]: ").strip()
         if not linha:
@@ -69,6 +121,9 @@ def loop(servico: ServicoAgente, console: Console, conversa_id: str | None = Non
         comando = linha.lower()
         if comando in SAIR:
             return
+        if comando in INSTRUCOES:
+            imprimir_instrucoes(servico.settings, console)
+            continue
         if comando == "limpar":
             servico.limpar_cache()
             console.print("Cache limpo.")
@@ -84,7 +139,7 @@ def loop(servico: ServicoAgente, console: Console, conversa_id: str | None = Non
                 continue
             console.print(f"CSV salvo em {caminho.resolve()}")
             continue
-        ultima = asyncio.run(servico.perguntar(linha, conversa_id))
+        ultima = event_loop.run_until_complete(servico.perguntar(linha, conversa_id))
         conversa_id = ultima.conversa_id
         imprimir_resposta(ultima, console)
 

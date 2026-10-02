@@ -55,8 +55,6 @@ def _settings() -> Settings:
         openrouter_api_key="",
         openrouter_models=[],
         gemini_api_keys=[],
-        openai_api_keys=[],
-        openai_api_key="",
         max_sql_retries=2,
         max_llm_requests=6,
     )
@@ -192,7 +190,7 @@ def test_piada_termina_sem_sql(db: ReadOnlyDatabase) -> None:
 @pytest.mark.live
 def test_fumaca_top10_devolve_avatar(db: ReadOnlyDatabase) -> None:
     settings = Settings()
-    if not (settings.openrouter_api_key or settings.gemini_keys() or settings.openai_keys()):
+    if not (settings.openrouter_api_key or settings.gemini_keys()):
         pytest.skip("Nenhuma chave de LLM no .env.")
 
     resultado = asyncio.run(responder(PERGUNTA_RECEITA, db=db, settings=settings, hoje=HOJE))

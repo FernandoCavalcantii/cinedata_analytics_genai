@@ -17,7 +17,6 @@ DB_CANDIDATES = (
 )
 
 CommaList = Annotated[list[str], NoDecode]
-DIRECT_PROVIDERS = ("gemini", "openai")
 
 
 class Settings(BaseSettings):
@@ -37,13 +36,6 @@ class Settings(BaseSettings):
     gemini_api_keys: CommaList = Field(default=[], alias="GEMINI_API_KEYS")
     gemini_model: str = Field(default="gemini-3.5-flash-lite", alias="GEMINI_MODEL")
 
-    openai_api_keys: CommaList = Field(default=[], alias="OPENAI_API_KEYS")
-    # Compatível com um .env antigo que ainda tenha uma única OPENAI_API_KEY.
-    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
-    # gemini ou openai. O outro provedor direto vem em seguida. OpenRouter fica sempre por último.
-    llm_primary: str = Field(default="gemini", alias="LLM_PRIMARY")
-
     db_path: str = Field(default="", alias="CINEROCKET_DB_PATH")
 
     sql_timeout_seconds: float = Field(default=10.0, alias="SQL_TIMEOUT_SECONDS")
@@ -58,40 +50,17 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = Field(default=60.0, alias="LLM_TIMEOUT_SECONDS")
     circuit_breaker_cooldown_seconds: float = Field(default=300.0, alias="CIRCUIT_BREAKER_COOLDOWN_SECONDS")
 
-    @field_validator("openrouter_models", "gemini_api_keys", "openai_api_keys", mode="before")
+    @field_validator("openrouter_models", "gemini_api_keys", mode="before")
     @classmethod
     def _split_comma_list(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
-    @field_validator("llm_primary", mode="before")
-    @classmethod
-    def _primary_provider(cls, value: object) -> str:
-        name = str(value or "gemini").strip().lower()
-        if name not in DIRECT_PROVIDERS:
-            raise ValueError("LLM_PRIMARY deve ser gemini ou openai.")
-        return name
-
     def gemini_keys(self) -> list[str]:
         """Todas as chaves Gemini, na ordem em que foram escritas, sem repetir."""
 
         return _unique_keys(self.gemini_api_keys)
-
-    def openai_keys(self) -> list[str]:
-        """Todas as chaves OpenAI. `OPENAI_API_KEY` entra depois de `OPENAI_API_KEYS`, sem repetir."""
-
-        keys = list(self.openai_api_keys)
-        if self.openai_api_key.strip():
-            keys.append(self.openai_api_key.strip())
-        return _unique_keys(keys)
-
-    def direct_provider_order(self) -> tuple[str, str]:
-        """Provedor escolhido primeiro e o outro em seguida. OpenRouter não entra aqui."""
-
-        first = self.llm_primary
-        second = "openai" if first == "gemini" else "gemini"
-        return first, second
 
     def resolve_db_path(self) -> Path:
         """Localiza o `cinerocket.db`; caminhos relativos partem da raiz do projeto."""

@@ -15,8 +15,10 @@ from datetime import date
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.models import Model
 
+from cinedata.agent.models import ModelRouter, build_router
 from cinedata.agent.retriever import normalize
 from cinedata.agent.sql_agent import ResultadoAgente, TurnoAnterior, Visualizacao, responder
 from cinedata.config import Settings
@@ -129,9 +131,17 @@ class ServicoAgente:
     hoje: date | None = None
     cache: CacheRespostas = field(init=False)
     _conversas: dict[str, list[_Turno]] = field(default_factory=dict)
+    _roteador: ModelRouter | None = None
 
     def __post_init__(self) -> None:
         self.cache = CacheRespostas(self.settings)
+
+    def roteador(self) -> ModelRouter:
+        """Monta a cadeia uma vez, para o circuit breaker sobreviver entre perguntas."""
+
+        if self._roteador is None:
+            self._roteador = build_router(self.settings)
+        return self._roteador
 
     async def perguntar(self, pergunta: str, conversa_id: str | None = None) -> RespostaServico:
         texto = pergunta.strip()
@@ -155,9 +165,19 @@ class ServicoAgente:
                 texto,
                 db=self.db,
                 settings=self.settings,
-                model=self.model,
+                model=self.model if self.model is not None else self.roteador().model,
                 hoje=self.hoje,
                 historico=historico,
+            )
+        except UsageLimitExceeded:
+            teto = self.settings.max_llm_requests
+            return self._erro(
+                conversa,
+                f"A pergunta usou as {teto} chamadas permitidas ao modelo e parou antes de responder. "
+                "Tente uma frase mais direta.",
+                inicio,
+                modelo="",
+                requisicoes=teto,
             )
         except Exception as exc:
             return self._erro(conversa, str(exc), inicio, modelo="")
@@ -201,12 +221,24 @@ class ServicoAgente:
             ),
         )
 
-    def _erro(self, conversa_id: str, mensagem: str, inicio: float, modelo: str) -> RespostaServico:
+    def _erro(
+        self,
+        conversa_id: str,
+        mensagem: str,
+        inicio: float,
+        modelo: str,
+        requisicoes: int = 0,
+    ) -> RespostaServico:
         return RespostaServico(
             conversa_id=conversa_id,
             status="erro",
             resposta=mensagem,
-            metadados=Metadados(modelo=modelo, requisicoes=0, tempo_ms=_ms(inicio), cache=False),
+            metadados=Metadados(
+                modelo=modelo,
+                requisicoes=requisicoes,
+                tempo_ms=_ms(inicio),
+                cache=False,
+            ),
         )
 
 

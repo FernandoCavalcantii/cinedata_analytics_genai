@@ -1,7 +1,7 @@
-"""Roteador de modelos: Gemini e OpenAI na ordem de LLM_PRIMARY, OpenRouter por último.
+"""Roteador de modelos: Gemini primeiro, OpenRouter por último.
 
 No free tier do OpenRouter, requisições que falham também consomem a cota diária.
-Por isso o cliente OpenAI do OpenRouter roda com `max_retries=0` e, depois de um
+Por isso o cliente do OpenRouter roda com `max_retries=0` e, depois de um
 erro de cota/permissão, o modelo fica "aberto" por um tempo e é pulado sem tocar a rede.
 """
 
@@ -17,11 +17,9 @@ from pydantic_ai.messages import ModelMessage, ModelResponse
 from pydantic_ai.models import Model, ModelRequestParameters
 from pydantic_ai.models.fallback import FallbackModel
 from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.models.wrapper import WrapperModel
 from pydantic_ai.providers.google import GoogleProvider
-from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
 
@@ -118,22 +116,13 @@ def _append_gemini(settings: Settings, models: list[Model], chain: list[str], br
         _append(models, chain, breakers, GoogleModel(settings.gemini_model, provider=provider), label, settings.circuit_breaker_cooldown_seconds)
 
 
-def _append_openai(settings: Settings, models: list[Model], chain: list[str], breakers: list[CircuitBreaker]) -> None:
-    for index, key in enumerate(settings.openai_keys(), start=1):
-        provider = OpenAIProvider(api_key=key)
-        label = f"openai:{settings.openai_model}#{index}"
-        _append(models, chain, breakers, OpenAIChatModel(settings.openai_model, provider=provider), label, settings.circuit_breaker_cooldown_seconds)
-
-
 def build_router(settings: Settings) -> ModelRouter:
     models: list[Model] = []
     chain: list[str] = []
     breakers: list[CircuitBreaker] = []
     cooldown = settings.circuit_breaker_cooldown_seconds
-    appenders = {"gemini": _append_gemini, "openai": _append_openai}
 
-    for provider_name in settings.direct_provider_order():
-        appenders[provider_name](settings, models, chain, breakers)
+    _append_gemini(settings, models, chain, breakers)
 
     if settings.openrouter_api_key and settings.openrouter_models:
         client = AsyncOpenAI(
@@ -154,7 +143,7 @@ def build_router(settings: Settings) -> ModelRouter:
 
     if not models:
         raise NoProviderConfiguredError(
-            "Nenhum provedor de LLM configurado. Defina GEMINI_API_KEYS, OPENAI_API_KEYS ou OPENROUTER_API_KEY no .env."
+            "Nenhum provedor de LLM configurado. Defina GEMINI_API_KEYS ou OPENROUTER_API_KEY no .env."
         )
 
     model = models[0] if len(models) == 1 else FallbackModel(*models)
