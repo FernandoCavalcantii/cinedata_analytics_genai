@@ -3,6 +3,7 @@
 import asyncio
 
 import pytest
+from pydantic import ValidationError
 from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
 from pydantic_ai.models import ModelRequestParameters
 from pydantic_ai.models.function import FunctionModel
@@ -16,8 +17,86 @@ def _settings_sem_chave() -> Settings:
         openrouter_api_key="",
         openrouter_models=[],
         gemini_api_keys=[],
+        openai_api_keys=[],
         openai_api_key="",
     )
+
+
+def test_cadeia_prioriza_gemini_depois_openai_e_deixa_openrouter_por_ultimo() -> None:
+    settings = Settings(
+        openrouter_api_key="chave-openrouter",
+        openrouter_models=["nvidia/nemotron-3.5-lightning:free", "openrouter/free"],
+        gemini_api_keys=["chave-gemini"],
+        gemini_model="gemini-3.5-flash-lite",
+        openai_api_keys=[],
+        openai_api_key="chave-openai",
+        openai_model="gpt-4o-mini",
+        llm_primary="gemini",
+    )
+
+    router = build_router(settings)
+
+    assert router.chain == [
+        "google:gemini-3.5-flash-lite#1",
+        "openai:gpt-4o-mini#1",
+        "openrouter:nvidia/nemotron-3.5-lightning:free",
+        "openrouter:openrouter/free",
+    ]
+
+
+def test_openai_primeiro_deixa_gemini_em_segundo_e_openrouter_por_ultimo() -> None:
+    settings = Settings(
+        openrouter_api_key="chave-openrouter",
+        openrouter_models=["openrouter/free"],
+        gemini_api_keys=["chave-gemini"],
+        gemini_model="gemini-3.5-flash-lite",
+        openai_api_keys=["chave-openai"],
+        openai_api_key="",
+        openai_model="gpt-4o-mini",
+        llm_primary="openai",
+    )
+
+    assert build_router(settings).chain == [
+        "openai:gpt-4o-mini#1",
+        "google:gemini-3.5-flash-lite#1",
+        "openrouter:openrouter/free",
+    ]
+
+
+def test_aceita_quantas_chaves_forem_escritas() -> None:
+    so_openrouter = Settings(
+        openrouter_api_key="chave-openrouter",
+        openrouter_models=["openrouter/free"],
+        gemini_api_keys=[],
+        openai_api_keys=[],
+        openai_api_key="",
+    )
+    assert build_router(so_openrouter).chain == ["openrouter:openrouter/free"]
+
+    tres = Settings(
+        openrouter_api_key="",
+        openrouter_models=[],
+        gemini_api_keys=["g1", "g2", "g3", "g4"],
+        gemini_model="gemini-3.5-flash-lite",
+        openai_api_keys=["o1", "o2"],
+        openai_api_key="o3",
+        openai_model="gpt-4o-mini",
+        llm_primary="gemini",
+    )
+    assert build_router(tres).chain == [
+        "google:gemini-3.5-flash-lite#1",
+        "google:gemini-3.5-flash-lite#2",
+        "google:gemini-3.5-flash-lite#3",
+        "google:gemini-3.5-flash-lite#4",
+        "openai:gpt-4o-mini#1",
+        "openai:gpt-4o-mini#2",
+        "openai:gpt-4o-mini#3",
+    ]
+
+
+def test_provedor_primario_desconhecido_falha_na_configuracao() -> None:
+    with pytest.raises(ValidationError, match="LLM_PRIMARY"):
+        Settings(llm_primary="openrouter")
 
 
 def test_sem_provedor_configurado() -> None:

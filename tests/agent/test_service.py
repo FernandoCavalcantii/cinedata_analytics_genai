@@ -19,6 +19,7 @@ def _settings(tmp_path) -> Settings:
         openrouter_api_key="",
         openrouter_models=[],
         gemini_api_keys=[],
+        openai_api_keys=[],
         openai_api_key="",
         max_sql_retries=2,
         max_llm_requests=6,
