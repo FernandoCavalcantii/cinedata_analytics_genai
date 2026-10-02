@@ -28,6 +28,7 @@ dev = [
 
 [project.scripts]
 cinedata = "cinedata.cli:main"
+cinedata-api = "cinedata.api.main:main"
 
 [build-system]
 requires = ["hatchling"]

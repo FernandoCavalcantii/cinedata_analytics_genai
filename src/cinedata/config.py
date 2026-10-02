@@ -49,8 +49,9 @@ class Settings(BaseSettings):
     cache_path: str = Field(default=".cache/respostas.json", alias="AGENT_CACHE_PATH")
     llm_timeout_seconds: float = Field(default=60.0, alias="LLM_TIMEOUT_SECONDS")
     circuit_breaker_cooldown_seconds: float = Field(default=300.0, alias="CIRCUIT_BREAKER_COOLDOWN_SECONDS")
+    cors_origins: CommaList = Field(default=[], alias="CORS_ORIGINS")
 
-    @field_validator("openrouter_models", "gemini_api_keys", mode="before")
+    @field_validator("openrouter_models", "gemini_api_keys", "cors_origins", mode="before")
     @classmethod
     def _split_comma_list(cls, value: object) -> object:
         if isinstance(value, str):
