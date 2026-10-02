@@ -1,0 +1,240 @@
+name: perguntas_obrigatorias
+cases:
+  - name: top10_receita
+    inputs: Top 10 filmes com maior receita em R$
+    metadata:
+      categoria: Bilheteria e Finanças
+      ranking: true
+      referencias:
+        - |
+          SELECT m.titulo, f.receita_brl
+          FROM dim_movies m
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          WHERE f.receita_brl > 0
+          ORDER BY f.receita_brl DESC
+          LIMIT 10
+
+  - name: lucro_medio_genero
+    inputs: Lucro médio por gênero, considerando apenas filmes com receita informada
+    metadata:
+      categoria: Bilheteria e Finanças
+      ranking: false
+      referencias:
+        - |
+          SELECT g.nome_genero, AVG(f.lucro_brl) AS lucro_medio_brl
+          FROM dim_genres g
+          JOIN bridge_movie_genre bmg ON g.sk_genre_id = bmg.sk_genre_id
+          JOIN fact_movies_performance f ON bmg.sk_movie_id = f.sk_movie_id
+          WHERE f.receita_brl > 0
+          GROUP BY g.nome_genero
+          ORDER BY lucro_medio_brl DESC
+
+  - name: maior_margem
+    inputs: Filmes com maior margem de lucro, entre os que possuem receita e orçamento informados
+    metadata:
+      categoria: Bilheteria e Finanças
+      ranking: true
+      referencias:
+        - |
+          SELECT m.titulo,
+                 f.lucro_brl * 100.0 / f.receita_brl AS margem_pct
+          FROM dim_movies m
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          WHERE f.receita_brl > 0 AND f.orcamento_brl > 0
+          ORDER BY margem_pct DESC
+          LIMIT 10
+        - |
+          SELECT m.titulo,
+                 f.lucro_brl * 100.0 / f.orcamento_brl AS roi_pct
+          FROM dim_movies m
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          WHERE f.receita_brl > 0 AND f.orcamento_brl > 0
+          ORDER BY roi_pct DESC
+          LIMIT 10
+
+  - name: cinco_populares
+    inputs: Os 5 filmes mais populares
+    metadata:
+      categoria: Popularidade e Engajamento
+      ranking: true
+      referencias:
+        - |
+          SELECT m.titulo, f.popularidade
+          FROM dim_movies m
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          ORDER BY f.popularidade DESC
+          LIMIT 5
+
+  - name: divergencia_tmdb_imdb
+    inputs: Filmes com maior divergência entre a nota TMDB e a nota IMDb
+    metadata:
+      categoria: Popularidade e Engajamento
+      ranking: true
+      referencias:
+        - |
+          SELECT m.titulo, ABS(f.nota_tmdb - f.nota_imdb) AS divergencia
+          FROM dim_movies m
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          WHERE f.nota_tmdb > 0 AND f.nota_imdb IS NOT NULL
+          ORDER BY divergencia DESC
+          LIMIT 10
+        - |
+          SELECT m.titulo, ABS(f.nota_tmdb - f.nota_imdb) AS divergencia
+          FROM dim_movies m
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          WHERE f.nota_tmdb > 0 AND f.nota_imdb IS NOT NULL AND f.qtd_imdb >= 50
+          ORDER BY divergencia DESC
+          LIMIT 10
+        - |
+          SELECT m.titulo, ABS(f.nota_tmdb - f.nota_imdb) AS divergencia
+          FROM dim_movies m
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          WHERE f.nota_tmdb > 0 AND f.nota_imdb IS NOT NULL
+            AND f.qtd_tmdb >= 50 AND f.qtd_imdb >= 50
+          ORDER BY divergencia DESC
+          LIMIT 10
+
+  - name: nota_media_por_ano
+    inputs: Nota média IMDb por ano de lançamento
+    metadata:
+      categoria: Popularidade e Engajamento
+      ranking: false
+      referencias:
+        - |
+          SELECT m.ano_lancamento, AVG(f.nota_imdb) AS media_imdb
+          FROM dim_movies m
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          WHERE f.nota_imdb IS NOT NULL AND f.nota_imdb > 0
+          GROUP BY m.ano_lancamento
+          ORDER BY m.ano_lancamento
+
+  - name: ator_cinco_anos
+    inputs: Ator com mais participações em filmes lançados nos últimos 5 anos
+    metadata:
+      categoria: Elenco e Equipe
+      ranking: true
+      referencias:
+        - |
+          SELECT p.nome_pessoa, COUNT(DISTINCT m.sk_movie_id) AS total_filmes
+          FROM dim_people p
+          JOIN bridge_movie_person bmp ON p.sk_person_id = bmp.sk_person_id
+          JOIN dim_movies m ON bmp.sk_movie_id = m.sk_movie_id
+          WHERE p.tipo_pessoa = 'Ator'
+            AND m.data_lancamento >= date('now', '-5 years')
+            AND m.data_lancamento <= date('now')
+          GROUP BY p.nome_pessoa
+          ORDER BY total_filmes DESC
+          LIMIT 5
+
+  - name: diretores_nota
+    inputs: Diretores com maior nota média (mínimo de 5 filmes)
+    metadata:
+      categoria: Elenco e Equipe
+      ranking: true
+      referencias:
+        - |
+          SELECT p.nome_pessoa AS diretor,
+                 AVG(f.nota_imdb) AS media_imdb,
+                 COUNT(DISTINCT m.sk_movie_id) AS qtd_filmes
+          FROM dim_people p
+          JOIN bridge_movie_person bmp ON p.sk_person_id = bmp.sk_person_id
+          JOIN dim_movies m ON bmp.sk_movie_id = m.sk_movie_id
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          WHERE p.tipo_pessoa = 'Diretor' AND f.nota_imdb IS NOT NULL AND f.nota_imdb > 0
+          GROUP BY p.nome_pessoa
+          HAVING COUNT(DISTINCT m.sk_movie_id) >= 5
+          ORDER BY media_imdb DESC
+          LIMIT 10
+
+  - name: dupla_ator_diretor
+    inputs: Dupla ator-diretor que mais trabalhou junta
+    metadata:
+      categoria: Elenco e Equipe
+      ranking: true
+      referencias:
+        - |
+          SELECT ator.nome_pessoa AS ator,
+                 diretor.nome_pessoa AS diretor,
+                 COUNT(DISTINCT m.sk_movie_id) AS parcerias
+          FROM dim_movies m
+          JOIN bridge_movie_person bmp_a ON m.sk_movie_id = bmp_a.sk_movie_id
+          JOIN dim_people ator ON bmp_a.sk_person_id = ator.sk_person_id AND ator.tipo_pessoa = 'Ator'
+          JOIN bridge_movie_person bmp_d ON m.sk_movie_id = bmp_d.sk_movie_id
+          JOIN dim_people diretor ON bmp_d.sk_person_id = diretor.sk_person_id AND diretor.tipo_pessoa = 'Diretor'
+          WHERE ator.nome_pessoa <> diretor.nome_pessoa
+          GROUP BY ator.nome_pessoa, diretor.nome_pessoa
+          ORDER BY parcerias DESC
+          LIMIT 10
+
+  - name: filmes_por_genero
+    inputs: Quantidade de filmes por gênero
+    metadata:
+      categoria: Gêneros e Produtoras
+      ranking: false
+      referencias:
+        - |
+          SELECT g.nome_genero, COUNT(DISTINCT bmg.sk_movie_id) AS total_filmes
+          FROM dim_genres g
+          JOIN bridge_movie_genre bmg ON g.sk_genre_id = bmg.sk_genre_id
+          GROUP BY g.nome_genero
+          ORDER BY total_filmes DESC
+
+  - name: produtora_lucro
+    inputs: Produtora com maior lucro total
+    metadata:
+      categoria: Gêneros e Produtoras
+      ranking: true
+      referencias:
+        - |
+          SELECT c.nome_produtora, SUM(f.lucro_brl) AS lucro_total_brl
+          FROM dim_companies c
+          JOIN bridge_movie_company bmc ON c.sk_company_id = bmc.sk_company_id
+          JOIN fact_movies_performance f ON bmc.sk_movie_id = f.sk_movie_id
+          WHERE f.receita_brl > 0
+          GROUP BY c.nome_produtora
+          ORDER BY lucro_total_brl DESC
+          LIMIT 10
+
+  - name: genero_margem
+    inputs: Gênero com maior margem de lucro média
+    metadata:
+      categoria: Gêneros e Produtoras
+      ranking: false
+      referencias:
+        - |
+          SELECT g.nome_genero,
+                 AVG(f.lucro_brl * 100.0 / f.receita_brl) AS margem_media_pct
+          FROM dim_genres g
+          JOIN bridge_movie_genre bmg ON g.sk_genre_id = bmg.sk_genre_id
+          JOIN fact_movies_performance f ON bmg.sk_movie_id = f.sk_movie_id
+          WHERE f.receita_brl > 0 AND f.orcamento_brl > 0
+          GROUP BY g.nome_genero
+          ORDER BY margem_media_pct DESC
+
+  - name: mais_avaliados
+    inputs: Filmes mais avaliados pelos usuários
+    metadata:
+      categoria: Avaliações dos Usuários
+      ranking: true
+      referencias:
+        - |
+          SELECT m.titulo, r.qtd_avaliacoes_usuarios, r.nota_media_usuarios
+          FROM dim_movies m
+          JOIN dim_reviews r ON m.sk_movie_id = r.sk_movie_id
+          ORDER BY r.qtd_avaliacoes_usuarios DESC
+          LIMIT 10
+
+  - name: divergencia_usuarios_imdb
+    inputs: Filmes em que a nota média dos usuários mais diverge da nota IMDb
+    metadata:
+      categoria: Avaliações dos Usuários
+      ranking: true
+      referencias:
+        - |
+          SELECT m.titulo, ABS(r.nota_media_usuarios - f.nota_imdb) AS divergencia
+          FROM dim_movies m
+          JOIN dim_reviews r ON m.sk_movie_id = r.sk_movie_id
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          WHERE f.nota_imdb IS NOT NULL AND f.nota_imdb > 0
+          ORDER BY divergencia DESC
+          LIMIT 10

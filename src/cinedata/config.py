@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     db_path: str = Field(default="", alias="CINEROCKET_DB_PATH")
 
-    sql_timeout_seconds: float = Field(default=10.0, alias="SQL_TIMEOUT_SECONDS")
+    sql_timeout_seconds: float = Field(default=30.0, alias="SQL_TIMEOUT_SECONDS")
     sql_max_rows: int = Field(default=200, alias="SQL_MAX_ROWS")
 
     max_sql_retries: int = Field(default=2, alias="AGENT_MAX_SQL_RETRIES")

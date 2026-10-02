@@ -196,7 +196,8 @@ BUSINESS_RULES: dict[str, str] = {
     ),
     "avaliacoes_usuarios": (
         "Avaliações de usuários: use dim_reviews (qtd_avaliacoes_usuarios, nota_media_usuarios) para rankings e "
-        "médias; use movie_reviews apenas para comentários/textos ou avaliações individuais."
+        "médias. Cada filme já é uma linha: não agrupe por titulo, porque títulos iguais podem ser filmes "
+        "diferentes. Use movie_reviews apenas para comentários/textos ou avaliações individuais."
     ),
     "minimos": (
         "Ao comparar médias ou divergências, um mínimo de votos/avaliações evita distorções; se aplicar um "
