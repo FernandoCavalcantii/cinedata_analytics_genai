@@ -77,6 +77,12 @@ def _format_cell(value: Any) -> str:
     return str(value).replace("|", "/").replace("\n", " ")[:120]
 
 
+def sqlite_readonly_uri(path: Path) -> str:
+    """URI somente leitura. O `:` do disco no Windows fica literal; o `%3A` não abre o arquivo."""
+
+    return f"file:{quote(path.as_posix(), safe='/:')}?mode=ro&immutable=1"
+
+
 def _authorizer(action: int, arg1: str | None, arg2: str | None, _db: str | None, _trigger: str | None) -> int:
     if action not in ALLOWED_ACTIONS:
         return sqlite3.SQLITE_DENY
@@ -96,7 +102,7 @@ class ReadOnlyDatabase:
             )
         self.timeout_seconds = timeout_seconds
         self.max_rows = max_rows
-        self._uri = f"file:{quote(self.path.as_posix(), safe='/')}?mode=ro&immutable=1"
+        self._uri = sqlite_readonly_uri(self.path)
 
     def _connect(self, deadline: float) -> sqlite3.Connection:
         connection = sqlite3.connect(self._uri, uri=True, check_same_thread=False)
