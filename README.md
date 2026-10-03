@@ -10,7 +10,7 @@ Na raiz do projeto, com o `.env` preenchido e o banco em `cinerocket-db/cinerock
 docker compose up --build
 ```
 
-A API fica em `http://127.0.0.1:8000`. A documentação interativa fica em `http://127.0.0.1:8000/docs`.
+A API fica em `http://127.0.0.1:8000`. A documentação interativa fica em `http://127.0.0.1:8000/docs`. O chat fica em `http://127.0.0.1:5173`.
 
 O banco é montado somente leitura em `/app/data/cinerocket.db`. A imagem não copia o `.env` nem o arquivo `.db`.
 

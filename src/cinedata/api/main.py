@@ -15,6 +15,7 @@ from cinedata.api.exceptions import registrar_erros
 from cinedata.api.router import router
 from cinedata.config import get_settings
 from cinedata.db.connection import ReadOnlyDatabase
+from cinedata.observability import ligar_observabilidade
 
 
 def create_app(
@@ -34,6 +35,7 @@ def create_app(
             return
 
         settings = get_settings()
+        ligar_observabilidade(settings.logfire_token)
         db = ReadOnlyDatabase(
             settings.resolve_db_path(),
             timeout_seconds=settings.sql_timeout_seconds,

@@ -86,7 +86,7 @@ class InformationRetriever:
     def __init__(self, db: ReadOnlyDatabase | None = None) -> None:
         self.db = db
 
-    def retrieve(self, question: str) -> RetrievalContext:
+    def retrieve(self, question: str, *, selecionar_schema: bool = True) -> RetrievalContext:
         normalized = normalize(question)
         tables: set[str] = {"dim_movies"}
         rules: list[str] = list(ALWAYS_RULES)
@@ -110,7 +110,7 @@ class InformationRetriever:
         if entity_tables & set(PEOPLE) and "pessoas" not in rules:
             rules.append("pessoas")
 
-        if not concepts and not hints:
+        if not selecionar_schema or (not concepts and not hints):
             tables = {table.name for table in TABLES}
             rules = list(BUSINESS_RULES)
 

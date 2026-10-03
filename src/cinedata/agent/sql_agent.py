@@ -21,14 +21,9 @@ from cinedata.agent.retriever import InformationRetriever, RetrievalContext
 from cinedata.config import Settings
 from cinedata.db.connection import DatabaseError, QueryResult, ReadOnlyDatabase
 from cinedata.guardrails.sql_guard import UnsafeSQLError, validate_sql
+from cinedata.knowledge import texto_exemplos
 
-EXEMPLOS_PROMPT = """\
-Pergunta: Quantos filmes estão com status Lançado?
-SQL: SELECT COUNT(*) AS quantidade FROM dim_movies WHERE status_filme = 'Lançado';
-
-Pergunta: Qual a duração em minutos do filme cujo título é exatamente 'Toy Story'?
-SQL: SELECT titulo, duracao_minutos FROM dim_movies WHERE titulo = 'Toy Story' LIMIT 5;
-"""
+EXEMPLOS_PROMPT = texto_exemplos()
 
 
 class Visualizacao(BaseModel):
@@ -199,7 +194,7 @@ async def responder(
     deps = AgentDeps(
         db=db,
         question=question,
-        context=InformationRetriever(db).retrieve(question),
+        context=InformationRetriever(db).retrieve(question, selecionar_schema=settings.schema_selector),
         hoje=hoje or date.today(),
         historico=list(historico or []),
     )

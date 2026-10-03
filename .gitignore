@@ -43,6 +43,9 @@ htmlcov/
 *.swo
 .DS_Store
 
+# Frontend
+node_modules/
+
 # Logs e cache de respostas do agente
 *.log
 logs/

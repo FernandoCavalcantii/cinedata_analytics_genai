@@ -19,5 +19,7 @@ build
 .vscode
 .idea
 tests
+frontend
+node_modules
 *.md
 !README.md

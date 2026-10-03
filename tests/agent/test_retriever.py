@@ -4,6 +4,7 @@ import pytest
 
 from cinedata.agent.retriever import InformationRetriever, _entity_candidates
 from cinedata.db import ReadOnlyDatabase
+from cinedata.db.catalog import TABLES
 
 DIM = "dim_movies"
 FACT = "fact_movies_performance"
@@ -53,3 +54,8 @@ def test_terror_vira_horror(db: ReadOnlyDatabase) -> None:
 def test_perguntas_do_edital(db: ReadOnlyDatabase, question: str, tables: set[str]) -> None:
     context = InformationRetriever(db).retrieve(question)
     assert set(context.tables) == tables
+
+
+def test_sem_seletor_entrega_todas_as_tabelas() -> None:
+    context = InformationRetriever().retrieve("Top 10 filmes com maior receita em R$", selecionar_schema=False)
+    assert context.tables == [table.name for table in TABLES]

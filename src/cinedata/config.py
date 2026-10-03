@@ -50,6 +50,8 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = Field(default=60.0, alias="LLM_TIMEOUT_SECONDS")
     circuit_breaker_cooldown_seconds: float = Field(default=300.0, alias="CIRCUIT_BREAKER_COOLDOWN_SECONDS")
     cors_origins: CommaList = Field(default=[], alias="CORS_ORIGINS")
+    schema_selector: bool = Field(default=True, alias="AGENT_SCHEMA_SELECTOR")
+    logfire_token: str = Field(default="", alias="LOGFIRE_TOKEN")
 
     @field_validator("openrouter_models", "gemini_api_keys", "cors_origins", mode="before")
     @classmethod

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from cinedata.knowledge import carregar_regras
+
 
 @dataclass(frozen=True)
 class Column:
@@ -157,58 +159,7 @@ TABLES: tuple[Table, ...] = (
 TABLES_BY_NAME: dict[str, Table] = {table.name: table for table in TABLES}
 TABLE_NAMES: frozenset[str] = frozenset(TABLES_BY_NAME)
 
-BUSINESS_RULES: dict[str, str] = {
-    "dialeto": (
-        "Banco SQLite. Use apenas SELECT (CTEs com WITH são permitidas). Datas são texto 'YYYY-MM-DD': "
-        "use date('now'), strftime e comparações de texto. Não existe ILIKE; LIKE já ignora maiúsculas em ASCII."
-    ),
-    "receita": (
-        "Receita = faturamento = bilheteria = arrecadação = receita_brl (em R$, padrão) ou receita_usd "
-        "se o usuário pedir dólar. 'Receita informada' significa receita_brl IS NOT NULL AND receita_brl > 0."
-    ),
-    "lucro": (
-        "lucro_brl só é confiável quando receita_brl > 0: se a receita é NULL, lucro_brl vale 0 ou -orcamento "
-        "(receita desconhecida, não prejuízo real); se o orçamento é NULL, lucro_brl = receita_brl. "
-        "Em análises de lucro filtre sempre receita_brl > 0."
-    ),
-    "margem": (
-        "Margem de lucro (%) = lucro_brl * 100.0 / receita_brl, exigindo receita_brl > 0 AND orcamento_brl > 0. "
-        "Retorno sobre orçamento (ROI %) = lucro_brl * 100.0 / orcamento_brl, só se o usuário pedir ROI/retorno."
-    ),
-    "notas": (
-        "nota_imdb e nota_tmdb usam escala 0-10. nota_tmdb = 0 significa sem votos: filtre nota_tmdb > 0. "
-        "Filtre nota_imdb IS NOT NULL. Quando o usuário disser só 'nota', use nota_imdb e diga isso na explicação."
-    ),
-    "divergencia": "Divergência entre notas = ABS(nota_a - nota_b), ordenada de forma decrescente.",
-    "popularidade": "Popularidade = fact_movies_performance.popularidade (TMDB); ignore valores NULL.",
-    "pessoas": (
-        "Atores: dim_people.tipo_pessoa = 'Ator'; diretores: 'Diretor'; roteiristas: 'Roteirista'. "
-        "Como a mesma pessoa tem um sk por papel, agrupe por nome_pessoa e conte COUNT(DISTINCT sk_movie_id). "
-        "Em duplas ator-diretor, exclua a mesma pessoa nos dois papéis (ator.nome_pessoa <> diretor.nome_pessoa)."
-    ),
-    "periodo": (
-        "'Últimos N anos' = data_lancamento >= date('now', '-N years') AND data_lancamento <= date('now'). "
-        "Ano específico: ano_lancamento = AAAA."
-    ),
-    "generos": (
-        "nome_genero está em INGLÊS: traduza o termo do usuário (ex.: 'ação' -> 'Action', 'terror' -> 'Horror', "
-        "'ficção científica' -> 'Science Fiction'). Contagens por gênero usam bridge_movie_genre."
-    ),
-    "avaliacoes_usuarios": (
-        "Avaliações de usuários: use dim_reviews (qtd_avaliacoes_usuarios, nota_media_usuarios) para rankings e "
-        "médias. Cada filme já é uma linha: não agrupe por titulo, porque títulos iguais podem ser filmes "
-        "diferentes. Use movie_reviews apenas para comentários/textos ou avaliações individuais."
-    ),
-    "minimos": (
-        "Ao comparar médias ou divergências, um mínimo de votos/avaliações evita distorções; se aplicar um "
-        "mínimo não pedido pelo usuário, informe o critério na explicação."
-    ),
-    "apresentacao": (
-        "Sempre traga colunas legíveis (titulo, nome_genero, nome_pessoa, nome_produtora) em vez de chaves sk_*. "
-        "Use ROUND(x, 2) em médias e percentuais e ORDER BY coerente com a pergunta. Sem LIMIT explícito na "
-        "pergunta, limite rankings a 10 linhas."
-    ),
-}
+BUSINESS_RULES: dict[str, str] = carregar_regras()
 
 GENRE_TRANSLATIONS: dict[str, str] = {
     "acao": "Action",

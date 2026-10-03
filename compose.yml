@@ -5,8 +5,19 @@ services:
     environment:
       CINEROCKET_DB_PATH: /app/data/cinerocket.db
       AGENT_CACHE_PATH: /tmp/respostas.json
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
     ports:
       - "8000:8000"
     volumes:
       # O arquivo do host entra só para leitura. A imagem não contém o banco.
       - "./cinerocket-db/cinerocket (1).db:/app/data/cinerocket.db:ro"
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://127.0.0.1:8000
+    ports:
+      - "5173:80"
+    depends_on:
+      - api

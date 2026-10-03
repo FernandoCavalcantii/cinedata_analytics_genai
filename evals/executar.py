@@ -42,8 +42,14 @@ def _ligar_spans() -> None:
         set_tracer_provider(TracerProvider())
 
 
-async def rodar(destino: Path = ARQUIVO_RELATORIO, somente: list[str] | None = None) -> None:
-    settings = get_settings().model_copy(update={"cache_enabled": False})
+async def rodar(
+    destino: Path = ARQUIVO_RELATORIO,
+    somente: list[str] | None = None,
+    *,
+    selecionar_schema: bool = True,
+    arquivo_resultados: Path = ARQUIVO_RESULTADOS,
+) -> None:
+    settings = get_settings().model_copy(update={"cache_enabled": False, "schema_selector": selecionar_schema})
     _ligar_spans()
     banco = ReadOnlyDatabase(
         settings.resolve_db_path(),
@@ -77,16 +83,29 @@ async def rodar(destino: Path = ARQUIVO_RELATORIO, somente: list[str] | None = N
     finally:
         banco_da_avaliacao.reset(token)
 
-    texto = gravar(relatorio, destino, teto=settings.max_llm_requests, substituir=somente)
+    texto = gravar(
+        relatorio,
+        destino,
+        teto=settings.max_llm_requests,
+        substituir=somente,
+        arquivo_resultados=arquivo_resultados,
+    )
     print(texto)
     print(f"Relatório gravado em {destino}")
 
 
-def gravar(relatorio, destino: Path, *, teto: int, substituir: list[str] | None) -> str:
+def gravar(
+    relatorio,
+    destino: Path,
+    *,
+    teto: int,
+    substituir: list[str] | None,
+    arquivo_resultados: Path = ARQUIVO_RESULTADOS,
+) -> str:
     novos = [_caso_de_relatorio(caso, teto) for caso in relatorio.cases]
     novos += [_caso_de_falha(falha) for falha in relatorio.failures]
-    if substituir and ARQUIVO_RESULTADOS.is_file():
-        guardados = json.loads(ARQUIVO_RESULTADOS.read_text(encoding="utf-8"))
+    if substituir and arquivo_resultados.is_file():
+        guardados = json.loads(arquivo_resultados.read_text(encoding="utf-8"))
         por_nome = {item["name"]: item for item in guardados["casos"]}
         for item in novos:
             por_nome[item["name"]] = item
@@ -102,7 +121,7 @@ def gravar(relatorio, destino: Path, *, teto: int, substituir: list[str] | None)
         "requisicoes_acumuladas": requisicoes,
         "casos": casos,
     }
-    ARQUIVO_RESULTADOS.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    arquivo_resultados.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     texto = formatar_casos(casos, requisicoes=requisicoes, quando=payload["data"])
     destino.write_text(texto, encoding="utf-8")
     return texto
@@ -190,10 +209,24 @@ def _afirmacao(caso, nome: str):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Avalia as 14 perguntas do edital contra o banco.")
-    parser.add_argument("--relatorio", type=Path, default=ARQUIVO_RELATORIO)
+    parser.add_argument("--relatorio", type=Path, default=None)
     parser.add_argument("--casos", nargs="*", default=None, help="Repete só estes nomes e mantém o restante do relatório.")
+    parser.add_argument(
+        "--sem-seletor",
+        action="store_true",
+        help="Ablação: manda o schema inteiro, sem o Schema Selector.",
+    )
     args = parser.parse_args()
-    asyncio.run(rodar(args.relatorio, args.casos or None))
+    destino = args.relatorio or (RAIZ / "relatorio_ablacao.md" if args.sem_seletor else ARQUIVO_RELATORIO)
+    resultados = RAIZ / ("resultados_ablacao.json" if args.sem_seletor else "resultados.json")
+    asyncio.run(
+        rodar(
+            destino,
+            args.casos or None,
+            selecionar_schema=not args.sem_seletor,
+            arquivo_resultados=resultados,
+        )
+    )
 
 
 if __name__ == "__main__":

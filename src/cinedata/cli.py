@@ -14,6 +14,7 @@ from rich.table import Table
 from cinedata.agent.service import RespostaServico, ServicoAgente
 from cinedata.config import Settings, get_settings
 from cinedata.db.connection import ReadOnlyDatabase
+from cinedata.observability import ligar_observabilidade
 
 SAIR = {"sair", "exit", "quit"}
 INSTRUCOES = {"instrucoes", "instruções", "ajuda", "help", "?"}
@@ -151,6 +152,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     settings = get_settings()
+    ligar_observabilidade(settings.logfire_token)
     db = ReadOnlyDatabase(
         settings.resolve_db_path(),
         timeout_seconds=settings.sql_timeout_seconds,

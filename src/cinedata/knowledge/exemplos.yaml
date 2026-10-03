@@ -1,0 +1,5 @@
+exemplos:
+- pergunta: Quantos filmes estão com status Lançado?
+  sql: SELECT COUNT(*) AS quantidade FROM dim_movies WHERE status_filme = 'Lançado';
+- pergunta: Qual a duração em minutos do filme cujo título é exatamente 'Toy Story'?
+  sql: SELECT titulo, duracao_minutos FROM dim_movies WHERE titulo = 'Toy Story' LIMIT 5;
