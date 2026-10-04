@@ -9,7 +9,8 @@ RUN useradd --create-home --uid 1000 appuser \
 COPY pyproject.toml README.md ./
 COPY src ./src
 
-RUN pip install --no-cache-dir .
+# O extra instala o Logfire. Sem LOGFIRE_TOKEN a API sobe e não envia trace.
+RUN pip install --no-cache-dir ".[observability]"
 
 USER appuser
 
