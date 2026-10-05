@@ -38,7 +38,7 @@ docker compose up -d --build
 
 Na primeira subida a imagem é construída. Nas seguintes, `docker compose up -d` basta. `docker compose down` para os containers. O banco fica no seu disco, montado só para leitura. A imagem não guarda o `.env` nem o `.db`.
 
-Uma pergunta igual a outra já respondida pode vir do cache e não chamar o modelo de novo.
+Uma pergunta igual a outra já respondida vem do cache e não chama o modelo. O funcionamento está em [Cache](#cache).
 
 <p align="right"><a href="#readme-top">voltar ao topo</a></p>
 
@@ -48,6 +48,7 @@ Uma pergunta igual a outra já respondida pode vir do cache e não chamar o mode
     <li><a href="#sobre-o-projeto">Sobre o projeto</a></li>
     <li><a href="#chat">Chat</a></li>
     <li><a href="#terminal">Terminal</a></li>
+    <li><a href="#cache">Cache</a></li>
     <li><a href="#o-que-perguntar">O que perguntar</a></li>
     <li><a href="#sem-docker">Sem Docker</a></li>
     <li><a href="#tecnologias">Tecnologias</a></li>
@@ -95,6 +96,22 @@ Comandos, escritos sozinhos e confirmados com Enter:
 - `sair`, `exit` ou `quit` encerra.
 
 `docker compose run --rm api cinedata --limpar-cache` apaga o cache e sai. `cinedata --conversa um-nome` continua uma conversa identificada por esse nome nesta sessão.
+
+<p align="right"><a href="#readme-top">voltar ao topo</a></p>
+
+## Cache
+
+O cache evita gastar cota do Gemini ou do OpenRouter com uma pergunta que já foi respondida. Não há um número máximo de perguntas: cada acerto com SQL entra no arquivo e permanece até alguém limpar o cache ou até as regras e o catálogo mudarem.
+
+A chave é o texto da pergunta, já sem diferença de maiúsculas, acentos e espaços repetidos. “Filmes mais avaliados pelos usuários” e “filmes mais avaliados pelos usuarios” são a mesma entrada. Uma frase diferente, mesmo que parecida, consulta o modelo de novo.
+
+Quando há acerto, a API devolve a resposta guardada com zero requisições ao modelo. Só entra no cache uma resposta com status certo e com SQL. Erro e pergunta fora do catálogo não são reaproveitados.
+
+No Docker o arquivo fica em `/tmp/respostas.json`, dentro do container da API. Ele dura enquanto esse container existir. `docker compose down` apaga o container e, com ele, o cache. No uso sem Docker o arquivo é `.cache/respostas.json`, na raiz do projeto.
+
+Para esvaziar, no terminal: `limpar`, ou `docker compose run --rm api cinedata --limpar-cache`. `AGENT_CACHE_ENABLED=false` no `.env` desliga o recurso.
+
+Isso é separado da memória da conversa. A memória guarda as últimas 3 perguntas da sessão atual para a frase seguinte fazer sentido (“e em dólar?”). Ela some quando o processo da API reinicia. O cache não some por isso.
 
 <p align="right"><a href="#readme-top">voltar ao topo</a></p>
 
