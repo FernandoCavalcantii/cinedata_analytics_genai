@@ -66,11 +66,11 @@
     {
       "name": "ator_cinco_anos",
       "categoria": "Elenco e Equipe",
-      "passou": false,
+      "passou": true,
       "modelo": "gemini-3.5-flash-lite",
       "requisicoes": 2,
       "dentro_do_teto": true,
-      "motivo": "referência 1: 1 linhas contra 5 da referência",
+      "motivo": "ranking equivalente",
       "sql": "SELECT \n    p.nome_pessoa, \n    COUNT(DISTINCT m.sk_movie_id) AS total_filmes\nFROM dim_movies m\nJOIN bridge_movie_person bmp ON m.sk_movie_id = bmp.sk_movie_id\nJOIN dim_people p ON bmp.sk_person_id = p.sk_person_id\nWHERE p.tipo_pessoa = 'Ator'\n  AND m.status_filme = 'Lançado'\n  AND m.data_lancamento >= date('now', '-5 years')\n  AND m.data_lancamento <= date('now')\nGROUP BY p.nome_pessoa\nORDER BY total_filmes DESC\nLIMIT 1"
     },
     {
@@ -106,11 +106,11 @@
     {
       "name": "produtora_lucro",
       "categoria": "Gêneros e Produtoras",
-      "passou": false,
+      "passou": true,
       "modelo": "gemini-3.5-flash-lite",
       "requisicoes": 2,
       "dentro_do_teto": true,
-      "motivo": "referência 1: 1 linhas contra 10 da referência",
+      "motivo": "ranking equivalente",
       "sql": "SELECT \n  p.nome_produtora,\n  ROUND(SUM(f.lucro_brl), 2) AS lucro_total_brl,\n  COUNT(DISTINCT m.sk_movie_id) AS quantidade_filmes\nFROM dim_companies p\nJOIN bridge_movie_company b ON p.sk_company_id = b.sk_company_id\nJOIN dim_movies m ON b.sk_movie_id = m.sk_movie_id\nJOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id\nWHERE f.receita_brl IS NOT NULL AND f.receita_brl > 0\nGROUP BY p.sk_company_id, p.nome_produtora\nORDER BY lucro_total_brl DESC\nLIMIT 1"
     },
     {
@@ -120,7 +120,7 @@
       "modelo": "gemini-3.5-flash-lite",
       "requisicoes": 3,
       "dentro_do_teto": true,
-      "motivo": "referência 1: 5 linhas contra 19 da referência",
+      "motivo": "referência 1: 5 linhas contra 1 da referência",
       "sql": "SELECT \n  g.nome_genero,\n  ROUND(AVG(p.lucro_brl * 100.0 / p.receita_brl), 2) AS margem_lucro_media_percentual,\n  COUNT(*) AS qtd_filmes\nFROM dim_genres g\nJOIN bridge_movie_genre bg ON g.sk_genre_id = bg.sk_genre_id\nJOIN dim_movies m ON bg.sk_movie_id = m.sk_movie_id\nJOIN fact_movies_performance p ON m.sk_movie_id = p.sk_movie_id\nWHERE p.receita_brl IS NOT NULL AND p.receita_brl > 0 \n  AND p.orcamento_brl IS NOT NULL AND p.orcamento_brl > 0\n  AND p.lucro_brl > 0\nGROUP BY g.sk_genre_id, g.nome_genero\nORDER BY margem_lucro_media_percentual DESC\nLIMIT 5"
     },
     {

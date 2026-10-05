@@ -25,7 +25,7 @@ def test_gabarito_repete_as_14_perguntas_na_ordem_do_edital():
     margem = next(caso for caso in dataset.cases if caso.name == "maior_margem")
     divergencia = next(caso for caso in dataset.cases if caso.name == "divergencia_tmdb_imdb")
     assert len(margem.metadata.referencias) == 2
-    assert len(divergencia.metadata.referencias) == 3
+    assert len(divergencia.metadata.referencias) == 4
 
 
 def test_numero_nulo_e_texto():

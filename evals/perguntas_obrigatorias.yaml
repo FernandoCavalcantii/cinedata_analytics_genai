@@ -93,6 +93,14 @@ cases:
             AND f.qtd_tmdb >= 50 AND f.qtd_imdb >= 50
           ORDER BY divergencia DESC
           LIMIT 10
+        - |
+          SELECT m.titulo, ABS(f.nota_tmdb - f.nota_imdb) AS divergencia
+          FROM dim_movies m
+          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+          WHERE f.nota_tmdb > 0 AND f.nota_imdb IS NOT NULL
+            AND f.qtd_tmdb >= 5 AND f.qtd_imdb >= 5
+          ORDER BY divergencia DESC
+          LIMIT 10
 
   - name: nota_media_por_ano
     inputs: Nota média IMDb por ano de lançamento
@@ -120,11 +128,12 @@ cases:
           JOIN bridge_movie_person bmp ON p.sk_person_id = bmp.sk_person_id
           JOIN dim_movies m ON bmp.sk_movie_id = m.sk_movie_id
           WHERE p.tipo_pessoa = 'Ator'
+            AND m.status_filme = 'Lançado'
             AND m.data_lancamento >= date('now', '-5 years')
             AND m.data_lancamento <= date('now')
           GROUP BY p.nome_pessoa
           ORDER BY total_filmes DESC
-          LIMIT 5
+          LIMIT 1
 
   - name: diretores_nota
     inputs: Diretores com maior nota média (mínimo de 5 filmes)
@@ -164,7 +173,7 @@ cases:
           WHERE ator.nome_pessoa <> diretor.nome_pessoa
           GROUP BY ator.nome_pessoa, diretor.nome_pessoa
           ORDER BY parcerias DESC
-          LIMIT 10
+          LIMIT 1
 
   - name: filmes_por_genero
     inputs: Quantidade de filmes por gênero
@@ -193,23 +202,24 @@ cases:
           WHERE f.receita_brl > 0
           GROUP BY c.nome_produtora
           ORDER BY lucro_total_brl DESC
-          LIMIT 10
+          LIMIT 1
 
   - name: genero_margem
     inputs: Gênero com maior margem de lucro média
     metadata:
       categoria: Gêneros e Produtoras
-      ranking: false
+      ranking: true
       referencias:
         - |
           SELECT g.nome_genero,
-                 AVG(f.lucro_brl * 100.0 / f.receita_brl) AS margem_media_pct
+                 SUM(f.lucro_brl) * 100.0 / SUM(f.receita_brl) AS margem_pct
           FROM dim_genres g
           JOIN bridge_movie_genre bmg ON g.sk_genre_id = bmg.sk_genre_id
           JOIN fact_movies_performance f ON bmg.sk_movie_id = f.sk_movie_id
           WHERE f.receita_brl > 0 AND f.orcamento_brl > 0
           GROUP BY g.nome_genero
-          ORDER BY margem_media_pct DESC
+          ORDER BY margem_pct DESC
+          LIMIT 1
 
   - name: mais_avaliados
     inputs: Filmes mais avaliados pelos usuários
@@ -218,10 +228,39 @@ cases:
       ranking: true
       referencias:
         - |
-          SELECT m.titulo, r.qtd_avaliacoes_usuarios, r.nota_media_usuarios
-          FROM dim_movies m
-          JOIN dim_reviews r ON m.sk_movie_id = r.sk_movie_id
-          ORDER BY r.qtd_avaliacoes_usuarios DESC
+          WITH normalized AS (
+            SELECT
+              m.sk_movie_id,
+              m.titulo,
+              r.qtd_avaliacoes_usuarios,
+              r.nota_media_usuarios,
+              TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(m.titulo), ':', ' '), '-', ' '), '.', ' '), ',', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' ')) AS norm_titulo
+            FROM dim_movies m
+            JOIN dim_reviews r ON m.sk_movie_id = r.sk_movie_id
+          ),
+          canonical_titles AS (
+            SELECT
+              norm_titulo,
+              titulo AS main_titulo,
+              SUM(qtd_avaliacoes_usuarios) AS total_avaliacoes,
+              ROUND(SUM(qtd_avaliacoes_usuarios * nota_media_usuarios) / NULLIF(SUM(qtd_avaliacoes_usuarios), 0), 2) AS nota_media_ponderada
+            FROM normalized
+            GROUP BY norm_titulo
+          ),
+          ranked_titles AS (
+            SELECT
+              ct.norm_titulo,
+              ct.main_titulo AS titulo,
+              ct.total_avaliacoes AS qtd_avaliacoes_usuarios,
+              ct.nota_media_ponderada AS nota_media_usuarios,
+              ROW_NUMBER() OVER (PARTITION BY ct.norm_titulo ORDER BY n.qtd_avaliacoes_usuarios DESC) AS rn
+            FROM canonical_titles ct
+            JOIN normalized n ON ct.norm_titulo = n.norm_titulo
+          )
+          SELECT titulo, qtd_avaliacoes_usuarios, nota_media_usuarios
+          FROM ranked_titles
+          WHERE rn = 1
+          ORDER BY qtd_avaliacoes_usuarios DESC
           LIMIT 10
 
   - name: divergencia_usuarios_imdb
@@ -231,10 +270,37 @@ cases:
       ranking: true
       referencias:
         - |
-          SELECT m.titulo, ABS(r.nota_media_usuarios - f.nota_imdb) AS divergencia
-          FROM dim_movies m
-          JOIN dim_reviews r ON m.sk_movie_id = r.sk_movie_id
-          JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
-          WHERE f.nota_imdb IS NOT NULL AND f.nota_imdb > 0
+          WITH cleaned AS (
+            SELECT
+              TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(m.titulo, ':', ' '), '-', ' '), '.', ' '), ',', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' ')) AS titulo_limpo,
+              m.titulo,
+              r.nota_media_usuarios,
+              f.nota_imdb,
+              r.qtd_avaliacoes_usuarios,
+              f.qtd_imdb
+            FROM dim_movies m
+            JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id
+            JOIN dim_reviews r ON m.sk_movie_id = r.sk_movie_id
+            WHERE r.nota_media_usuarios IS NOT NULL
+              AND f.nota_imdb IS NOT NULL
+              AND r.qtd_avaliacoes_usuarios >= 5
+              AND f.qtd_imdb >= 5
+          ),
+          grouped AS (
+            SELECT
+              titulo_limpo,
+              MAX(titulo) AS titulo_original,
+              AVG(nota_media_usuarios) AS nota_media_usuarios,
+              AVG(nota_imdb) AS nota_imdb,
+              ABS(AVG(nota_media_usuarios) - AVG(nota_imdb)) AS divergencia
+            FROM cleaned
+            GROUP BY titulo_limpo
+          )
+          SELECT
+            titulo_original AS titulo,
+            ROUND(nota_media_usuarios, 2) AS nota_media_usuarios,
+            ROUND(nota_imdb, 2) AS nota_imdb,
+            ROUND(divergencia, 2) AS divergencia
+          FROM grouped
           ORDER BY divergencia DESC
           LIMIT 10

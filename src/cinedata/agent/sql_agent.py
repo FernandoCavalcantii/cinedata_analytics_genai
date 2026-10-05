@@ -98,9 +98,11 @@ Hoje é {deps.hoje.isoformat()}.
 
 {_historico_prompt(deps.historico)}
 Para qualquer pergunta sobre os filmes, chame a ferramenta executar_consulta_sql.
-Leia as linhas que ela devolver. Se vierem vazias, se as colunas não forem as da pergunta
-ou se os valores parecerem implausíveis, chame a ferramenta de novo com outro SQL.
-Se as linhas respondem à pergunta, escreva a resposta final com esses números, sem inventar outros.
+Leia as linhas que ela devolver. Se vierem vazias ou se as colunas não forem as da pergunta,
+chame a ferramenta de novo com outro SQL.
+Se a consulta seguiu as regras de negócio e devolveu linhas, escreva a resposta final com esses números,
+mesmo que um percentual ou uma média pareça alto. Não consulte de novo só porque o valor surpreende.
+Não invente números que a ferramenta não devolveu.
 A resposta final tem três campos: resposta (texto para quem não lê SQL), explicacao
 (a regra de negócio que você aplicou) e visualizacao (tipo de gráfico e eixos).
 
@@ -136,8 +138,9 @@ def formatar_linhas(result: QueryResult) -> str:
         )
     else:
         aviso = (
-            "Se as colunas ou os valores não respondem à pergunta, chame executar_consulta_sql de novo. "
-            "Se respondem, escreva a resposta final com estes números, sem inventar outros."
+            "Se as colunas não são as da pergunta, chame executar_consulta_sql de novo. "
+            "Se a consulta seguiu as regras e estas linhas respondem, escreva a resposta final com estes números. "
+            "Um percentual ou uma média alta não é motivo para outra consulta."
         )
     return f"{cabecalho}\n{aviso}\n\n{result.preview_markdown(max_rows=30)}"
 
@@ -160,8 +163,9 @@ def build_sql_agent(settings: Settings) -> Agent[AgentDeps, RespostaDoModelo]:
     def executar_consulta_sql(ctx: RunContext[AgentDeps], sql: str) -> str:
         """Executa um único SELECT somente leitura no catálogo e devolve as linhas.
 
-        Chame de novo se o resultado vier vazio, se as colunas não corresponderem à pergunta
-        ou se os valores parecerem implausíveis. Não use para pedidos que não sejam sobre o catálogo.
+        Chame de novo se o resultado vier vazio ou se as colunas não corresponderem à pergunta.
+        Não chame de novo só porque um percentual ou uma média parece alto.
+        Não use para pedidos que não sejam sobre o catálogo.
         """
 
         ctx.deps.tentativas += 1

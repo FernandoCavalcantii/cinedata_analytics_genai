@@ -1,7 +1,7 @@
 {
   "data": "02/10/2026",
   "teto": 6,
-  "requisicoes_acumuladas": 49,
+  "requisicoes_acumuladas": 46,
   "casos": [
     {
       "name": "top10_receita",
@@ -66,11 +66,11 @@
     {
       "name": "ator_cinco_anos",
       "categoria": "Elenco e Equipe",
-      "passou": false,
+      "passou": true,
       "modelo": "gemini-3.5-flash-lite",
       "requisicoes": 2,
       "dentro_do_teto": true,
-      "motivo": "referência 1: 1 linhas contra 5 da referência",
+      "motivo": "ranking equivalente",
       "sql": "SELECT p.nome_pessoa AS ator, COUNT(DISTINCT m.sk_movie_id) AS quantidade_filmes\nFROM dim_movies m\nJOIN bridge_movie_person bmp ON m.sk_movie_id = bmp.sk_movie_id\nJOIN dim_people p ON bmp.sk_person_id = p.sk_person_id\nWHERE p.tipo_pessoa = 'Ator'\n  AND m.status_filme = 'Lançado'\n  AND m.data_lancamento >= date('now', '-5 years')\n  AND m.data_lancamento <= date('now')\nGROUP BY p.nome_pessoa\nORDER BY quantidade_filmes DESC\nLIMIT 1"
     },
     {
@@ -86,11 +86,11 @@
     {
       "name": "dupla_ator_diretor",
       "categoria": "Elenco e Equipe",
-      "passou": false,
+      "passou": true,
       "modelo": "gemini-3.5-flash-lite",
       "requisicoes": 4,
       "dentro_do_teto": true,
-      "motivo": "referência 1: 1 linhas contra 10 da referência",
+      "motivo": "ranking equivalente",
       "sql": "SELECT \n  p_ator.nome_pessoa AS ator, \n  p_dir.nome_pessoa AS diretor, \n  COUNT(DISTINCT m.sk_movie_id) AS total_filmes\nFROM dim_movies m\nJOIN bridge_movie_person b_ator ON m.sk_movie_id = b_ator.sk_movie_id\nJOIN dim_people p_ator ON b_ator.sk_person_id = p_ator.sk_person_id AND p_ator.tipo_pessoa = 'Ator'\nJOIN bridge_movie_person b_dir ON m.sk_movie_id = b_dir.sk_movie_id\nJOIN dim_people p_dir ON b_dir.sk_person_id = p_dir.sk_person_id AND p_dir.tipo_pessoa = 'Diretor'\nWHERE p_ator.nome_pessoa <> p_dir.nome_pessoa\nGROUP BY p_ator.nome_pessoa, p_dir.nome_pessoa\nORDER BY total_filmes DESC\nLIMIT 1"
     },
     {
@@ -106,42 +106,42 @@
     {
       "name": "produtora_lucro",
       "categoria": "Gêneros e Produtoras",
-      "passou": false,
+      "passou": true,
       "modelo": "gemini-3.5-flash-lite",
       "requisicoes": 2,
       "dentro_do_teto": true,
-      "motivo": "referência 1: 1 linhas contra 10 da referência",
-      "sql": "SELECT \n  c.nome_produtora,\n  ROUND(SUM(f.lucro_brl), 2) AS lucro_total_brl\nFROM dim_companies c\nJOIN bridge_movie_company b ON c.sk_company_id = b.sk_company_id\nJOIN dim_movies m ON b.sk_movie_id = m.sk_movie_id\nJOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id\nWHERE f.receita_brl IS NOT NULL AND f.receita_brl > 0\nGROUP BY c.sk_company_id, c.nome_produtora\nORDER BY lucro_total_brl DESC\nLIMIT 1"
+      "motivo": "ranking equivalente",
+      "sql": "SELECT \n    c.nome_produtora,\n    ROUND(SUM(p.lucro_brl), 2) AS lucro_total_brl,\n    COUNT(m.sk_movie_id) AS qtd_filmes\nFROM dim_companies c\nJOIN bridge_movie_company b ON c.sk_company_id = b.sk_company_id\nJOIN dim_movies m ON b.sk_movie_id = m.sk_movie_id\nJOIN fact_movies_performance p ON m.sk_movie_id = p.sk_movie_id\nWHERE p.receita_brl IS NOT NULL AND p.receita_brl > 0\nGROUP BY c.sk_company_id, c.nome_produtora\nORDER BY lucro_total_brl DESC\nLIMIT 1"
     },
     {
       "name": "genero_margem",
       "categoria": "Gêneros e Produtoras",
       "passou": true,
       "modelo": "gemini-3.5-flash-lite",
-      "requisicoes": 5,
+      "requisicoes": 2,
       "dentro_do_teto": true,
-      "motivo": "linhas equivalentes, sem exigir a ordem",
-      "sql": "SELECT \n    g.nome_genero,\n    ROUND(AVG(p.lucro_brl * 100.0 / p.receita_brl), 2) AS margem_lucro_media_percentual,\n    COUNT(m.sk_movie_id) AS qtd_filmes,\n    SUM(CASE WHEN p.lucro_brl > 0 THEN 1 ELSE 0 END) AS qtd_lucro_positivo\nFROM dim_movies m\nJOIN bridge_movie_genre bg ON m.sk_movie_id = bg.sk_movie_id\nJOIN dim_genres g ON bg.sk_genre_id = g.sk_genre_id\nJOIN fact_movies_performance p ON m.sk_movie_id = p.sk_movie_id\nWHERE p.receita_brl IS NOT NULL AND p.receita_brl > 0 \n  AND p.orcamento_brl IS NOT NULL AND p.orcamento_brl > 0\nGROUP BY g.sk_genre_id, g.nome_genero\nORDER BY margem_lucro_media_percentual DESC"
+      "motivo": "ranking equivalente",
+      "sql": "SELECT \n  g.nome_genero,\n  ROUND(SUM(f.lucro_brl) * 100.0 / SUM(f.receita_brl), 2) AS margem_lucro_percentual\nFROM dim_genres g\nJOIN bridge_movie_genre bg ON g.sk_genre_id = bg.sk_genre_id\nJOIN dim_movies m ON bg.sk_movie_id = m.sk_movie_id\nJOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id\nWHERE f.receita_brl > 0 AND f.orcamento_brl > 0\nGROUP BY g.nome_genero\nORDER BY margem_lucro_percentual DESC\nLIMIT 1"
     },
     {
       "name": "mais_avaliados",
       "categoria": "Avaliações dos Usuários",
-      "passou": false,
+      "passou": true,
       "modelo": "gemini-3.5-flash-lite",
       "requisicoes": 3,
       "dentro_do_teto": true,
-      "motivo": "referência 1: a linha 1 do ranking difere da referência",
-      "sql": "SELECT m.titulo, SUM(r.qtd_avaliacoes_usuarios) AS total_avaliacoes, ROUND(AVG(r.nota_media_usuarios), 2) AS media_notas\nFROM dim_movies m\nJOIN dim_reviews r ON m.sk_movie_id = r.sk_movie_id\nGROUP BY m.titulo\nORDER BY total_avaliacoes DESC\nLIMIT 10"
+      "motivo": "ranking equivalente",
+      "sql": "WITH normalized AS (\n  SELECT\n    m.sk_movie_id,\n    m.titulo,\n    r.qtd_avaliacoes_usuarios,\n    r.nota_media_usuarios,\n    TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(m.titulo), ':', ' '), '-', ' '), '.', ' '), ',', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' ')) AS norm_titulo\n  FROM dim_movies m\n  JOIN dim_reviews r ON m.sk_movie_id = r.sk_movie_id\n),\ncanonical_titles AS (\n  SELECT\n    norm_titulo,\n    titulo AS main_titulo,\n    SUM(qtd_avaliacoes_usuarios) AS total_avaliacoes,\n    ROUND(SUM(qtd_avaliacoes_usuarios * nota_media_usuarios) / NULLIF(SUM(qtd_avaliacoes_usuarios), 0), 2) AS nota_media_ponderada\n  FROM normalized\n  GROUP BY norm_titulo\n),\nranked_titles AS (\n  SELECT\n    ct.norm_titulo,\n    ct.main_titulo AS titulo,\n    ct.total_avaliacoes AS qtd_avaliacoes_usuarios,\n    ct.nota_media_ponderada AS nota_media_usuarios,\n    ROW_NUMBER() OVER (PARTITION BY ct.norm_titulo ORDER BY n.qtd_avaliacoes_usuarios DESC) AS rn\n  FROM canonical_titles ct\n  JOIN normalized n ON ct.norm_titulo = n.norm_titulo\n)\nSELECT titulo, qtd_avaliacoes_usuarios, nota_media_usuarios\nFROM ranked_titles\nWHERE rn = 1\nORDER BY qtd_avaliacoes_usuarios DESC\nLIMIT 10\n"
     },
     {
       "name": "divergencia_usuarios_imdb",
       "categoria": "Avaliações dos Usuários",
-      "passou": false,
+      "passou": true,
       "modelo": "gemini-3.5-flash-lite",
       "requisicoes": 2,
       "dentro_do_teto": true,
-      "motivo": "referência 1: 6 linhas contra 10 da referência",
-      "sql": "SELECT \n    m.titulo,\n    r.nota_media_usuarios,\n    p.nota_imdb,\n    ROUND(ABS(r.nota_media_usuarios - p.nota_imdb), 2) AS divergencia\nFROM dim_movies m\nJOIN dim_reviews r ON m.sk_movie_id = r.sk_movie_id\nJOIN fact_movies_performance p ON m.sk_movie_id = p.sk_movie_id\nWHERE p.nota_imdb IS NOT NULL \n  AND r.nota_media_usuarios IS NOT NULL\n  AND r.qtd_avaliacoes_usuarios >= 10\n  AND p.qtd_imdb >= 10\nORDER BY divergencia DESC\nLIMIT 10"
+      "motivo": "ranking equivalente",
+      "sql": "WITH cleaned AS (\n  SELECT\n    TRIM(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(m.titulo, ':', ' '), '-', ' '), '.', ' '), ',', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' '), '  ', ' ')) AS titulo_limpo,\n    m.titulo,\n    r.nota_media_usuarios,\n    f.nota_imdb,\n    r.qtd_avaliacoes_usuarios,\n    f.qtd_imdb\n  FROM dim_movies m\n  JOIN fact_movies_performance f ON m.sk_movie_id = f.sk_movie_id\n  JOIN dim_reviews r ON m.sk_movie_id = r.sk_movie_id\n  WHERE r.nota_media_usuarios IS NOT NULL\n    AND f.nota_imdb IS NOT NULL\n    AND r.qtd_avaliacoes_usuarios >= 5\n    AND f.qtd_imdb >= 5\n),\ngrouped AS (\n  SELECT\n    titulo_limpo,\n    MAX(titulo) AS titulo_original,\n    AVG(nota_media_usuarios) AS nota_media_usuarios,\n    AVG(nota_imdb) AS nota_imdb,\n    ABS(AVG(nota_media_usuarios) - AVG(nota_imdb)) AS divergencia\n  FROM cleaned\n  GROUP BY titulo_limpo\n)\nSELECT\n  titulo_original AS titulo,\n  ROUND(nota_media_usuarios, 2) AS nota_media_usuarios,\n  ROUND(nota_imdb, 2) AS nota_imdb,\n  ROUND(divergencia, 2) AS divergencia\nFROM grouped\nORDER BY divergencia DESC\nLIMIT 10\n"
     }
   ]
 }

@@ -2,31 +2,59 @@ regras:
   dialeto: 'Banco SQLite. Use apenas SELECT (CTEs com WITH são permitidas). Datas são texto ''YYYY-MM-DD'':
     use date(''now''), strftime e comparações de texto. Não existe ILIKE; LIKE já ignora maiúsculas em
     ASCII.'
-  receita: Receita = faturamento = bilheteria = arrecadação = receita_brl (em R$, padrão) ou receita_usd
-    se o usuário pedir dólar. 'Receita informada' significa receita_brl IS NOT NULL AND receita_brl >
-    0.
+  receita: 'Receita = faturamento = bilheteria = arrecadação. O padrão é receita_brl, em R$. Se o usuário
+    pedir dólar, dólar americano, USD, US$ ou dollar, use receita_usd. Receita informada usa a coluna da
+    moeda pedida: no padrão, receita_brl IS NOT NULL AND receita_brl > 0; em dólar, a mesma condição em
+    receita_usd. Não há euro, peso nem outra moeda: diga que a base só tem real e dólar e não converta.'
   lucro: 'lucro_brl só é confiável quando receita_brl > 0: se a receita é NULL, lucro_brl vale 0 ou -orcamento
     (receita desconhecida, não prejuízo real); se o orçamento é NULL, lucro_brl = receita_brl. Em análises
-    de lucro filtre sempre receita_brl > 0.'
-  margem: Margem de lucro (%) = lucro_brl * 100.0 / receita_brl, exigindo receita_brl > 0 AND orcamento_brl
-    > 0. Retorno sobre orçamento (ROI %) = lucro_brl * 100.0 / orcamento_brl, só se o usuário pedir ROI/retorno.
+    de lucro filtre sempre a receita da moeda pedida > 0. O padrão é lucro_brl e orcamento_brl. Se o usuário
+    pedir dólar, dólar americano, USD, US$ ou dollar, use lucro_usd, orcamento_usd e receita_usd com a
+    mesma regra. Não há outra moeda: não converta.'
+  margem: 'Margem de um filme (%) = lucro_brl * 100.0 / receita_brl, com receita_brl > 0 AND orcamento_brl
+    > 0. Para um grupo (gênero, ano, produtora, diretor), use uma coluna só: SUM(lucro_brl) * 100.0 /
+    SUM(receita_brl). Não use AVG(lucro_brl * 100.0 / receita_brl): um filme de receita minúscula domina
+    essa média. Não descarte filmes com receita menor ou igual ao orçamento. Se a pergunta for em dólar,
+    troque lucro_brl, receita_brl e orcamento_brl pelas colunas em USD nas mesmas fórmulas. ROI (%) =
+    lucro_brl * 100.0 / orcamento_brl, ou as colunas em USD se a pergunta for em dólar, só se o usuário
+    pedir ROI ou retorno.'
   notas: 'nota_imdb e nota_tmdb usam escala 0-10. nota_tmdb = 0 significa sem votos: filtre nota_tmdb
     > 0. Filtre nota_imdb IS NOT NULL. Quando o usuário disser só ''nota'', use nota_imdb e diga isso
     na explicação.'
-  divergencia: Divergência entre notas = ABS(primeira nota - segunda nota), ordenada de forma decrescente.
+  divergencia: 'Divergência = ABS(primeira medida - segunda medida), ordenada de forma decrescente, nas
+    duas medidas que a pergunta citar (receita, orçamento, popularidade, duração ou nota). Se a pergunta
+    for sobre notas e não disser quais, compare nota_tmdb e nota_imdb. Nota de usuários é nota_media_usuarios.
+    Junte as fichas do mesmo filme depois da limpeza de titulo, e calcule a divergência nessa linha. Só
+    nesse caso de notas, exija pelo menos 5 votos em cada nota, como na regra minimos.'
   popularidade: Popularidade = fact_movies_performance.popularidade (TMDB); ignore valores NULL.
   pessoas: 'Atores: dim_people.tipo_pessoa = ''Ator''; diretores: ''Diretor''; roteiristas: ''Roteirista''.
     Como a mesma pessoa tem um sk por papel, agrupe por nome_pessoa e conte COUNT(DISTINCT sk_movie_id).
-    Em duplas ator-diretor, exclua a mesma pessoa nos dois papéis (ator.nome_pessoa <> diretor.nome_pessoa).'
+    Em qualquer dupla de papéis (ator-diretor, ator-roteirista, diretor-roteirista), exclua a mesma pessoa
+    nos dois papéis: o nome_pessoa de um lado diferente do nome_pessoa do outro.'
   periodo: '''Últimos N anos'' = data_lancamento >= date(''now'', ''-N years'') AND data_lancamento <=
     date(''now''). Ano específico: ano_lancamento = AAAA.'
   generos: 'nome_genero está em INGLÊS: traduza o termo do usuário (ex.: ''ação'' -> ''Action'', ''terror''
     -> ''Horror'', ''ficção científica'' -> ''Science Fiction''). Contagens por gênero usam bridge_movie_genre.'
-  avaliacoes_usuarios: 'Avaliações de usuários: use dim_reviews (qtd_avaliacoes_usuarios, nota_media_usuarios)
-    para rankings e médias. Cada filme já é uma linha: não agrupe por titulo, porque títulos iguais podem
-    ser filmes diferentes. Use movie_reviews apenas para comentários/textos ou avaliações individuais.'
-  minimos: Ao comparar médias ou divergências, um mínimo de votos/avaliações evita distorções; se aplicar
-    um mínimo não pedido pelo usuário, informe o critério na explicação.
-  apresentacao: Sempre traga colunas legíveis (titulo, nome_genero, nome_pessoa, nome_produtora) em vez
-    de chaves sk_*. Use ROUND(x, 2) em médias e percentuais e ORDER BY coerente com a pergunta. Sem LIMIT
-    explícito na pergunta, limite rankings a 10 linhas.
+  avaliacoes_usuarios: 'Avaliações de usuários ficam em dim_reviews. O mesmo filme foi gravado mais de uma
+    vez, com sk_movie_id diferente. Num ranking pela quantidade de avaliações, some as fichas do mesmo
+    titulo. Grafias que só diferem em maiúsculas, espaços ou pontuação (: - . ,) são o mesmo titulo:
+    troque essa pontuação por espaço e depois junte os espaços repetidos num só. Um título com espaço
+    antes e depois dos dois pontos é o mesmo que o título sem esses espaços. Um título mais curto, sem
+    o restante do nome, continua separado. Mostre a grafia que mais contribui para a soma. Some
+    qtd_avaliacoes_usuarios e traga ROUND(AVG(nota_media_usuarios), 2). A mesma limpeza de titulo vale
+    sempre que a resposta for uma lista de filmes, como na regra apresentacao. Use movie_reviews apenas
+    para comentários ou avaliações individuais.'
+  minimos: 'Não aplique piso de votos, de filmes ou de valor se a pergunta não pedir. A única exceção é
+    divergência entre notas: exija pelo menos 5 votos em cada nota comparada (qtd_avaliacoes_usuarios,
+    qtd_imdb ou qtd_tmdb). Uma avaliação solitária cria uma distância enorme. Fora isso, não invente corte.'
+  apresentacao: 'Sempre traga colunas legíveis (titulo, nome_genero, nome_pessoa, nome_produtora) em vez
+    de chaves sk_*. Use ROUND(x, 2) em médias e percentuais e ORDER BY coerente com a pergunta. Se a pergunta
+    diz a quantidade (top 10, os 5), use esse LIMIT. Se pede um único vencedor no singular (ator com mais,
+    dupla que mais, produtora com maior, gênero com maior), use LIMIT 1. Se pede um ranking no plural sem
+    quantidade (filmes com maior, diretores com maior), use LIMIT 10. Se pede a medida de cada grupo (por
+    gênero, por ano, quantidade por), devolva uma linha por grupo, sem LIMIT. Quando a resposta lista
+    filmes, uma linha por filme. Grafias que só diferem em maiúsculas, espaços ou pontuação (: - . ,)
+    são o mesmo titulo: troque essa pontuação por espaço e depois junte os espaços repetidos num só.
+    Um título com espaço antes e depois dos dois pontos é o mesmo que o título sem esses espaços. Um
+    título mais curto, sem o restante do nome, continua separado. Mostre a grafia que mais contribui.
+    Não acrescente medida que a pergunta não pediu.'

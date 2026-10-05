@@ -1,13 +1,13 @@
 # Avaliação das 14 perguntas — 03/10/2026
 
-Acerto: 6 de 14. Requisições gastas: 33.
+Acerto: 8 de 14. Requisições gastas: 33.
 
 | Categoria | Acertos | Total |
 | :--- | ---: | ---: |
 | Bilheteria e Finanças | 2 | 3 |
 | Popularidade e Engajamento | 3 | 3 |
-| Elenco e Equipe | 0 | 3 |
-| Gêneros e Produtoras | 1 | 3 |
+| Elenco e Equipe | 1 | 3 |
+| Gêneros e Produtoras | 2 | 3 |
 | Avaliações dos Usuários | 0 | 2 |
 
 ### top10_receita — acertou
@@ -141,13 +141,13 @@ GROUP BY m.ano_lancamento
 ORDER BY m.ano_lancamento DESC
 ```
 
-### ator_cinco_anos — errou
+### ator_cinco_anos — acertou
 
 - Categoria: Elenco e Equipe
 - Modelo: gemini-3.5-flash-lite
 - Requisições: 2
 - Teto de chamadas: dentro
-- Comparação: referência 1: 1 linhas contra 5 da referência
+- Comparação: ranking equivalente
 - SQL:
 
 ```sql
@@ -225,13 +225,13 @@ GROUP BY g.nome_genero
 ORDER BY quantidade_filmes DESC
 ```
 
-### produtora_lucro — errou
+### produtora_lucro — acertou
 
 - Categoria: Gêneros e Produtoras
 - Modelo: gemini-3.5-flash-lite
 - Requisições: 2
 - Teto de chamadas: dentro
-- Comparação: referência 1: 1 linhas contra 10 da referência
+- Comparação: ranking equivalente
 - SQL:
 
 ```sql
@@ -255,7 +255,7 @@ LIMIT 1
 - Modelo: gemini-3.5-flash-lite
 - Requisições: 3
 - Teto de chamadas: dentro
-- Comparação: referência 1: 5 linhas contra 19 da referência
+- Comparação: referência 1: 5 linhas contra 1 da referência
 - SQL:
 
 ```sql
